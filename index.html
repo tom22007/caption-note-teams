@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Caption Note</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://res.cdn.office.net/teams-js/2.34.0/js/MicrosoftTeams.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Caption Note</h1>
+    <p class="lead">Reads Teams live captions from the screen and saves them as a note. Does not use Record or Transcribe.</p>
+    <ol>
+      <li>Turn on live captions: More (...) → Language and speech → Show live captions.</li>
+      <li>Pop captions out if you can.</li>
+      <li>Click Start, then pick the <strong>Captions</strong> window (or the meeting window).</li>
+    </ol>
+    <div class="row">
+      <button id="startBtn" class="start">Start</button>
+      <button id="stopBtn" class="stop" disabled>Stop</button>
+      <span id="status">Not recording.</span>
+    </div>
+    <pre id="transcript" aria-live="polite"></pre>
+    <div class="row">
+      <button id="saveBtn" class="secondary">Download note</button>
+      <button id="copyBtn" class="secondary">Copy</button>
+      <button id="clearBtn" class="secondary">Clear</button>
+    </div>
+    <video id="preview" muted playsinline></video>
+    <canvas id="frame" hidden></canvas>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

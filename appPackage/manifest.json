@@ -1,0 +1,49 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "d3d3032b-8c2a-4874-9c07-5f1d75ee58ae",
+  "developer": {
+    "name": "El Sea",
+    "websiteUrl": "https://tom22007.github.io/caption-note-teams/",
+    "privacyUrl": "https://tom22007.github.io/caption-note-teams/privacy.html",
+    "termsOfUseUrl": "https://tom22007.github.io/caption-note-teams/privacy.html"
+  },
+  "name": {
+    "short": "Caption Note",
+    "full": "Caption Note for Teams"
+  },
+  "description": {
+    "short": "Save Teams live captions into a note.",
+    "full": "Caption Note reads Microsoft Teams live captions from the screen and saves a speaker-labeled note. It does not use Teams Record or Transcribe, so meeting policies that block those features do not block this app."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#2563EB",
+  "staticTabs": [
+    {
+      "entityId": "captionnote",
+      "name": "Caption Note",
+      "contentUrl": "https://tom22007.github.io/caption-note-teams/index.html",
+      "websiteUrl": "https://tom22007.github.io/caption-note-teams/index.html",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://tom22007.github.io/caption-note-teams/config.html",
+      "canUpdateConfiguration": false,
+      "scopes": ["team", "groupchat"],
+      "context": [
+        "meetingChatTab",
+        "meetingDetailsTab",
+        "meetingSidePanel",
+        "meetingStage"
+      ]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": ["tom22007.github.io"]
+}

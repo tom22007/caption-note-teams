@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Add Caption Note</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://res.cdn.office.net/teams-js/2.34.0/js/MicrosoftTeams.min.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Add Caption Note</h1>
+    <p>This adds Caption Note to the meeting. Click Save below, then Start in the side panel after live captions are on.</p>
+  </main>
+  <script>
+    microsoftTeams.app.initialize().then(function () {
+      microsoftTeams.pages.config.registerOnSaveHandler(function (saveEvent) {
+        microsoftTeams.pages.config.setConfig({
+          entityId: "captionnote",
+          contentUrl: "https://tom22007.github.io/caption-note-teams/index.html",
+          websiteUrl: "https://tom22007.github.io/caption-note-teams/index.html",
+          suggestedDisplayName: "Caption Note"
+        });
+        saveEvent.notifySuccess();
+      });
+      microsoftTeams.pages.config.setValidityState(true);
+    });
+  </script>
+</body>
+</html>
