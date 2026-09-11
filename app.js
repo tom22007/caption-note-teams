@@ -1,24 +1,22 @@
 (function () {
-  var startBtn = document.getElementById("startBtn");
-  var stopBtn = document.getElementById("stopBtn");
-  var saveBtn = document.getElementById("saveBtn");
-  var copyBtn = document.getElementById("copyBtn");
-  var clearBtn = document.getElementById("clearBtn");
-  var statusEl = document.getElementById("status");
-  var transcriptEl = document.getElementById("transcript");
-  var video = document.getElementById("preview");
-  var canvas = document.getElementById("frame");
-  var stream = null;
-  var timer = null;
-  var worker = null;
-  var busy = false;
-  var committed = [];
-  var startedAt = null;
-  var nameLike = /^[A-Z][A-Za-z'.\-]+(?: [A-Z][A-Za-z'.\-]+){0,4}$/;
-
-  if (window.microsoftTeams && microsoftTeams.app) {
-    microsoftTeams.app.initialize().catch(function () {});
-  }
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const copyBtn = document.getElementById("copyBtn");
+  const clearBtn = document.getElementById("clearBtn");
+  const statusEl = document.getElementById("status");
+  const transcriptEl = document.getElementById("transcript");
+  const video = document.getElementById("preview");
+  const canvas = document.getElementById("frame");
+  
+  let stream = null;
+  let timer = null;
+  let worker = null;
+  let busy = false;
+  let committed = [];
+  let startedAt = null;
+  
+  const nameLike = /^[A-Z][A-Za-z'.\-]+(?: [A-Z][A-Za-z'.\-]+){0,4}$/;
 
   function setStatus(text, ok) {
     statusEl.textContent = text;
@@ -37,16 +35,18 @@
   }
 
   function parseTurns(raw) {
-    var lines = raw.replace(/\r/g, "").split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
-    var turns = [];
-    var speaker = null;
-    var buf = [];
-    function flush() {
+    const lines = raw.replace(/\r/g, "").split("\n").map(s => s.trim()).filter(Boolean);
+    const turns = [];
+    let speaker = null;
+    let buf = [];
+    
+    const flush = () => {
       if (speaker && buf.length) turns.push(speaker + ": " + buf.join(" "));
       buf = [];
-    }
-    for (var i = 0; i < lines.length; i++) {
-      var n = lines[i];
+    };
+    
+    for (let i = 0; i < lines.length; i++) {
+      const n = lines[i];
       if (isSpeaker(n)) {
         if (speaker && n !== speaker) flush();
         speaker = n;
@@ -65,26 +65,33 @@
       committed = snap.slice();
       return;
     }
-    var last = committed[committed.length - 1];
-    var match = -1;
-    for (var i = 0; i < snap.length; i++) {
-      var s = snap[i];
+    
+    const last = committed[committed.length - 1];
+    let match = -1;
+    
+    for (let i = 0; i < snap.length; i++) {
+      const s = snap[i];
       if (s === last || s.indexOf(last) === 0 || last.indexOf(s) === 0) {
         match = i;
         break;
       }
     }
+    
     if (match >= 0) {
       if (snap[match].length >= last.length) committed[committed.length - 1] = snap[match];
-      for (var j = match + 1; j < snap.length; j++) committed.push(snap[j]);
+      for (let j = match + 1; j < snap.length; j++) committed.push(snap[j]);
       return;
     }
-    for (var k = 0; k < snap.length; k++) {
-      var line = snap[k];
-      var dup = false;
-      for (var c = 0; c < committed.length; c++) {
-        var ex = committed[c];
-        if (ex === line || ex.indexOf(line) === 0 || line.indexOf(ex) === 0) { dup = true; break; }
+    
+    for (let k = 0; k < snap.length; k++) {
+      const line = snap[k];
+      let dup = false;
+      for (let c = 0; c < committed.length; c++) {
+        const ex = committed[c];
+        if (ex === line || ex.indexOf(line) === 0 || line.indexOf(ex) === 0) { 
+          dup = true; 
+          break; 
+        }
       }
       if (!dup) committed.push(line);
     }
@@ -92,26 +99,41 @@
 
   async function tick() {
     if (!stream || busy) return;
-    var track = stream.getVideoTracks()[0];
+    
+    const track = stream.getVideoTracks()[0];
     if (!track || track.readyState !== "live") {
       stopRecording();
       setStatus("Caption window was closed.", false);
       return;
     }
+    
     busy = true;
     try {
-      var w = video.videoWidth || 640;
-      var h = video.videoHeight || 360;
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 360;
+      
+      // PERFORMANCE FIX: Only capture the bottom 35% of the screen where captions usually appear
+      const cropY = Math.floor(h * 0.65);
+      const cropH = h - cropY;
+      
       canvas.width = w;
-      canvas.height = h;
-      var ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0, w, h);
-      if (!worker) worker = await Tesseract.createWorker("eng");
-      var result = await worker.recognize(canvas);
+      canvas.height = cropH;
+      const ctx = canvas.getContext("2d");
+      
+      // Draw only the cropped section onto the canvas
+      ctx.drawImage(video, 0, cropY, w, cropH, 0, 0, w, cropH);
+      
+      if (!worker) {
+        setStatus("Loading OCR engine (first time takes a moment)...", true);
+        worker = await Tesseract.createWorker("eng");
+      }
+      
+      const result = await worker.recognize(canvas);
       mergeTurns(parseTurns(result.data.text || ""));
       render();
       setStatus("Recording · " + committed.length + " lines", true);
     } catch (err) {
+      console.error(err);
       setStatus("Could not read captions: " + err.message, false);
     }
     busy = false;
@@ -127,31 +149,40 @@
       setStatus("Screen pick was cancelled.", false);
       return;
     }
+    
     committed = [];
     startedAt = new Date();
     video.srcObject = stream;
     video.classList.add("on");
     await video.play();
+    
     startBtn.disabled = true;
     stopBtn.disabled = false;
     setStatus("Reading captions from the selected window…", true);
+    
     timer = setInterval(tick, 2000);
     tick();
-    stream.getVideoTracks()[0].addEventListener("ended", function () {
+    
+    stream.getVideoTracks()[0].addEventListener("ended", () => {
       stopRecording();
     });
   }
 
   async function stopRecording() {
-    if (timer) { clearInterval(timer); timer = null; }
+    if (timer) { 
+      clearInterval(timer); 
+      timer = null; 
+    }
     if (stream) {
-      stream.getTracks().forEach(function (t) { t.stop(); });
+      stream.getTracks().forEach(t => t.stop());
       stream = null;
     }
+    
     video.srcObject = null;
     video.classList.remove("on");
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    
     if (worker) {
       try { await worker.terminate(); } catch (e) {}
       worker = null;
@@ -160,11 +191,11 @@
   }
 
   function noteText() {
-    var when = startedAt || new Date();
+    const when = startedAt || new Date();
     return [
       "Caption Note",
       "Date: " + when.toISOString().slice(0, 16).replace("T", " "),
-      "Source: Microsoft Teams live captions",
+      "Source: Live Captions",
       "",
       "------------------------------------------------",
       "",
@@ -175,17 +206,25 @@
 
   startBtn.addEventListener("click", startRecording);
   stopBtn.addEventListener("click", stopRecording);
-  saveBtn.addEventListener("click", function () {
-    var blob = new Blob([noteText()], { type: "text/plain" });
-    var a = document.createElement("a");
+  
+  saveBtn.addEventListener("click", () => {
+    const blob = new Blob([noteText()], { type: "text/plain" });
+    const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "CaptionNote-" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".txt";
     a.click();
   });
-  copyBtn.addEventListener("click", function () {
-    if (navigator.clipboard) navigator.clipboard.writeText(noteText());
+  
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(noteText());
+      setStatus("Copied to clipboard!", true);
+    } catch (err) {
+      setStatus("Failed to copy. Please select and copy manually.", false);
+    }
   });
-  clearBtn.addEventListener("click", function () {
+  
+  clearBtn.addEventListener("click", () => {
     committed = [];
     render();
   });
