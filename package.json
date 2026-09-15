@@ -1,0 +1,57 @@
+{
+  "name": "caption-note",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Caption Note — desktop shell for OCR live captions from Teams, Zoom, or Google Meet",
+  "main": "desktop/main.cjs",
+  "author": "Tommy O'Donnell",
+  "license": "MIT",
+  "scripts": {
+    "desktop": "electron .",
+    "desktop:build": "electron-builder --mac --win",
+    "desktop:build:mac": "electron-builder --mac",
+    "desktop:build:win": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.captionnote.app",
+    "productName": "Caption Note",
+    "copyright": "Copyright © Tommy O'Donnell",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "index.html",
+      "app.js",
+      "styles.css",
+      "desktop/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true,
+      "entitlements": "desktop/entitlements.mac.plist",
+      "entitlementsInherit": "desktop/entitlements.mac.plist",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "Caption Note needs Screen Recording permission to OCR live captions from meeting apps (Teams, Zoom, Google Meet)."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Caption Note"
+    }
+  }
+}
