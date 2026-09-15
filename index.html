@@ -10,25 +10,27 @@
 <body>
   <main>
     <h1>Caption Note</h1>
-    <p class="lead">Reads live captions from your screen and saves them as a note. Does not use Record or Transcribe.</p>
+    <p class="lead">Reads live captions from Teams, Zoom, or Google Meet via screen share + OCR, then saves them as a note. Does not use Record or Transcribe APIs.</p>
     <ol>
-      <li>Turn on live captions in Teams: More (…) → Language and speech → Show live captions.</li>
-      <li>Pop captions out into their own window if you can.</li>
+      <li>Turn on <strong>live captions</strong> in your meeting app (Teams, Zoom, or Google Meet).</li>
+      <li>Pop captions out into their own window if the app allows it.</li>
       <li>Use <strong>Chrome or Edge</strong>. On a Mac, allow Screen Recording for that browser in System Settings → Privacy &amp; Security.</li>
-      <li>Click Start, then share the <strong>Captions</strong> window. If the preview is black, share the <strong>entire screen</strong> instead — Teams windows often capture black.</li>
+      <li>Pick your platform below, click Start, then share the <strong>captions</strong> window. If the preview is black, share the <strong>entire screen</strong> instead — some meeting windows capture black on macOS.</li>
     </ol>
     <div class="row">
       <button id="startBtn" class="start">Start</button>
       <button id="stopBtn" class="stop" disabled>Stop</button>
-      <label class="mode">Region
-        <select id="region">
+      <label class="mode">Platform
+        <select id="platform" aria-describedby="platformHint">
           <option value="auto" selected>Auto</option>
-          <option value="full">Full share</option>
-          <option value="bottom">Bottom captions</option>
+          <option value="teams">Teams</option>
+          <option value="zoom">Zoom</option>
+          <option value="meet">Google Meet</option>
         </select>
       </label>
       <span id="status">Not recording.</span>
     </div>
+    <p class="platform-hint" id="platformHint">Auto detects a short captions popup vs a tall meeting/screen and crops accordingly.</p>
     <pre id="transcript" aria-live="polite"></pre>
     <div class="row">
       <button id="saveBtn" class="secondary">Download note</button>

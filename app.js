@@ -7,7 +7,8 @@
   const statusEl = document.getElementById("status");
   const transcriptEl = document.getElementById("transcript");
   const hintEl = document.getElementById("ocrHint");
-  const regionEl = document.getElementById("region");
+  const platformEl = document.getElementById("platform");
+  const platformHintEl = document.getElementById("platformHint");
   const video = document.getElementById("preview");
   const frame = document.getElementById("frame");
   const ocrView = document.getElementById("ocrView");
@@ -19,12 +20,40 @@
   let committed = [];
   let startedAt = null;
   let blackStreak = 0;
+  let lastHadText = false;
+  let tickMs = 1200;
+
+  const TICK_IDLE_MS = 1200;
+  const TICK_FLOWING_MS = 900;
 
   const nameLike = /^[A-Z][A-Za-z'.\-]+(?: [A-Z][A-Za-z'.\-]+){0,4}$/;
+
+  const PLATFORM_LABELS = {
+    auto: "Auto",
+    teams: "Teams",
+    zoom: "Zoom",
+    meet: "Meet"
+  };
+
+  const PLATFORM_HINTS = {
+    auto: "Auto detects a short captions popup vs a tall meeting/screen and crops accordingly.",
+    teams: "Share the Teams Captions popup or Entire Screen. Teams windows often capture black on Mac — prefer Entire Screen if the preview is black.",
+    zoom: "Share the Zoom captions window or Entire Screen.",
+    meet: "Share Entire Screen (or the Meet tab). Meet captions sit in a bottom overlay — no separate captions window."
+  };
 
   function setStatus(text, ok) {
     statusEl.textContent = text;
     statusEl.style.color = ok === false ? "#dc2626" : ok ? "#16a34a" : "#4b5563";
+  }
+
+  function updatePlatformHint() {
+    const key = platformEl.value;
+    platformHintEl.textContent = PLATFORM_HINTS[key] || PLATFORM_HINTS.auto;
+  }
+
+  function sourceLabel() {
+    return PLATFORM_LABELS[platformEl.value] || "Auto";
   }
 
   function render() {
@@ -123,15 +152,49 @@
     });
   }
 
-  function captionCrop(w, h, mode) {
-    if (mode === "full") return { x: 0, y: 0, w: w, h: h };
-    if (mode === "bottom") {
-      const ch = Math.max(Math.floor(h * 0.36), 90);
+  /**
+   * Platform-aware caption crop presets.
+   *
+   * Fractions are tuned for typical live-caption layouts when sharing
+   * Entire Screen (tall). Short/wide shares (popped-out caption windows)
+   * use the full frame for Teams/Zoom/Auto.
+   *
+   * - auto:   short/wide → full; else bottom ~36% (legacy behaviour)
+   * - teams:  short/wide → full (Captions popup); else bottom ~40%
+   * - zoom:   short/wide → full (captions window); else bottom ~34%
+   * - meet:   Meet-style bottom overlay ~28% tall, slight side inset
+   *           (Meet has no separate captions window)
+   */
+  function captionCrop(w, h, platform) {
+    const shortWide = h <= 520 || h / w <= 0.5;
+
+    if (platform === "meet") {
+      // Google Meet: captions are a compact bottom-center overlay on the
+      // meeting UI. Crop a thinner bottom band with modest side inset so
+      // chrome/side panels are less likely to confuse OCR.
+      const ch = Math.max(Math.floor(h * 0.28), 100);
+      const inset = Math.floor(w * 0.08);
+      return { x: inset, y: h - ch, w: Math.max(w - inset * 2, 1), h: ch };
+    }
+
+    if (platform === "teams") {
+      // Teams: prefer full frame for a popped-out Captions window; otherwise
+      // a slightly taller bottom band for in-meeting / Entire Screen share.
+      if (shortWide) return { x: 0, y: 0, w: w, h: h };
+      const ch = Math.max(Math.floor(h * 0.40), 120);
       return { x: 0, y: h - ch, w: w, h: ch };
     }
-    // Auto: a popped-out captions window is short/wide. A meeting or full
-    // screen is tall, with captions near the bottom.
-    if (h <= 520 || h / w <= 0.5) return { x: 0, y: 0, w: w, h: h };
+
+    if (platform === "zoom") {
+      // Zoom: captions popup or in-meeting bottom bar. Bottom band is a bit
+      // tighter than Teams because Zoom's caption strip is usually shorter.
+      if (shortWide) return { x: 0, y: 0, w: w, h: h };
+      const ch = Math.max(Math.floor(h * 0.34), 110);
+      return { x: 0, y: h - ch, w: w, h: ch };
+    }
+
+    // Auto (default): same logic as before the multi-platform MVP.
+    if (shortWide) return { x: 0, y: 0, w: w, h: h };
     const ch = Math.max(Math.floor(h * 0.36), 120);
     return { x: 0, y: h - ch, w: w, h: ch };
   }
@@ -183,6 +246,18 @@
     return worker;
   }
 
+  function scheduleTicks() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(tick, tickMs);
+  }
+
+  function adjustTickRate(hadText) {
+    const next = hadText ? TICK_FLOWING_MS : TICK_IDLE_MS;
+    if (next === tickMs) return;
+    tickMs = next;
+    if (timer) scheduleTicks();
+  }
+
   async function tick() {
     if (!stream || busy) return;
 
@@ -204,7 +279,7 @@
         return;
       }
 
-      const crop = captionCrop(w, h, regionEl.value);
+      const crop = captionCrop(w, h, platformEl.value);
       frame.width = crop.w;
       frame.height = crop.h;
       const fctx = frame.getContext("2d", { willReadFrequently: true });
@@ -226,10 +301,15 @@
       await ensureWorker();
       const result = await worker.recognize(ocrView);
       const raw = (result && result.data && result.data.text || "").trim();
-      hintEl.textContent = raw ? ("OCR: " + raw.replace(/\s+/g, " ").slice(0, 180)) : "OCR: (no text in this frame — pick the Captions window or Entire Screen)";
+      const hadText = !!raw;
+      lastHadText = hadText;
+      adjustTickRate(hadText);
+      hintEl.textContent = raw
+        ? ("OCR: " + raw.replace(/\s+/g, " ").slice(0, 180))
+        : "OCR: (no text in this frame — pick the captions window or Entire Screen)";
       mergeTurns(parseTurns(raw));
       render();
-      setStatus("Recording · " + committed.length + " lines", true);
+      setStatus("Recording (" + sourceLabel() + ") · " + committed.length + " lines", true);
     } catch (err) {
       console.error(err);
       setStatus("Could not read captions: " + (err && err.message ? err.message : err), false);
@@ -261,6 +341,8 @@
 
     committed = [];
     blackStreak = 0;
+    lastHadText = false;
+    tickMs = TICK_IDLE_MS;
     startedAt = new Date();
     render();
     hintEl.textContent = "";
@@ -270,13 +352,13 @@
 
     startBtn.disabled = true;
     stopBtn.disabled = false;
-    setStatus("Reading captions from the selected window…", true);
+    setStatus("Reading captions (" + sourceLabel() + ") from the selected window…", true);
 
     try { await ensureWorker(); } catch (err) {
       setStatus("Could not start OCR: " + err.message, false);
     }
 
-    timer = setInterval(tick, 1200);
+    scheduleTicks();
     tick();
 
     stream.getVideoTracks()[0].addEventListener("ended", function () {
@@ -298,6 +380,7 @@
     video.classList.remove("on");
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    tickMs = TICK_IDLE_MS;
     setStatus(committed.length ? "Stopped." : "Stopped. No captions captured.", committed.length > 0);
   }
 
@@ -306,7 +389,7 @@
     return [
       "Caption Note",
       "Date: " + when.toISOString().slice(0, 16).replace("T", " "),
-      "Source: Live Captions",
+      "Source: Live Captions (" + sourceLabel() + ")",
       "",
       "------------------------------------------------",
       "",
@@ -317,6 +400,8 @@
 
   startBtn.addEventListener("click", startRecording);
   stopBtn.addEventListener("click", stopRecording);
+  platformEl.addEventListener("change", updatePlatformHint);
+  updatePlatformHint();
 
   saveBtn.addEventListener("click", function () {
     const blob = new Blob([noteText()], { type: "text/plain" });
